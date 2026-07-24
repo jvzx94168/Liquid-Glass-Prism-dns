@@ -2,7 +2,7 @@
 
 set -e
 
-REPO="mslxi/Liquid-Glass-Prism-dns"
+REPO="jvzx94168/Liquid-Glass-Prism-dns"
 BINARY_NAME="prism-agent"
 INSTALL_DIR="/usr/local/bin"
 SERVICE_NAME="prism-agent"
@@ -99,19 +99,20 @@ parse_args() {
 
 uninstall_agent() {
     step "Uninstalling Prism Agent ($SERVICE_NAME)..."
-    
-    systemctl stop "$SERVICE_NAME" 2>/dev/null || true
-    systemctl disable "$SERVICE_NAME" 2>/dev/null || true
-    
-    if [ -f "/etc/systemd/system/${SERVICE_NAME}.service" ]; then
-        rm "/etc/systemd/system/${SERVICE_NAME}.service"
+
+    if [ "$OS_FAMILY" = "alpine" ]; then
+        rc-service "$SERVICE_NAME" stop 2>/dev/null || true
+        rc-update del "$SERVICE_NAME" default 2>/dev/null || true
+        rm -f "/etc/init.d/${SERVICE_NAME}"
+    else
+        systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+        systemctl disable "$SERVICE_NAME" 2>/dev/null || true
+        rm -f "/etc/systemd/system/${SERVICE_NAME}.service"
         systemctl daemon-reload
     fi
-    
-    if [ -f "$INSTALL_DIR/$BINARY_NAME" ]; then
-        rm "$INSTALL_DIR/$BINARY_NAME"
-    fi
-    
+
+    rm -f "$INSTALL_DIR/$BINARY_NAME"
+
     info "Uninstallation completed."
     exit 0
 }
@@ -119,6 +120,14 @@ uninstall_agent() {
 detect_system() {
     ARCH=$(uname -m)
     OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+
+    # 检测 Alpine
+    if [ -f /etc/alpine-release ]; then
+        OS_FAMILY="alpine"
+        info "Detected Alpine Linux (OpenRC)"
+    else
+        OS_FAMILY="systemd"
+    fi
 
     case "$ARCH" in
         x86_64) ARCH_SUFFIX="amd64" ;;
@@ -133,7 +142,7 @@ detect_system() {
 download_binary() {
     step "Fetching version info..."
 
-    API_URL="https://api.github.com/repos/$REPO/releases"
+    API_URL="https://api.github.com/repos/${REPO}/releases"
     
     if [ "$BETA_MODE" = true ]; then
         info "Mode: ${YELLOW}Beta Channel (Pre-release)${NC}"
@@ -183,7 +192,7 @@ download_binary() {
 
     if [ -z "$DOWNLOAD_URL" ]; then
         warn "Smart search failed, trying fallback..."
-        DOWNLOAD_URL="https://github.com/$REPO/releases/latest/download/$ASSET_NAME"
+        DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/$ASSET_NAME"
     fi
 
     if [ -n "$VERSION" ]; then
@@ -208,6 +217,50 @@ download_binary() {
 }
 
 configure_service() {
+    if [ "$OS_FAMILY" = "alpine" ]; then
+        configure_openrc
+    else
+        configure_systemd
+    fi
+}
+
+configure_openrc() {
+    step "Configuring OpenRC service..."
+
+    SERVICE_FILE="/etc/init.d/${SERVICE_NAME}"
+
+    EXEC_ARGS="--master \"$MASTER_ADDR\" --secret \"$SECRET_TOKEN\""
+
+    if [ "$SMART_MODE" = true ]; then
+        EXEC_ARGS="$EXEC_ARGS --smart"
+    fi
+
+    if [ -n "$CUSTOM_IP" ]; then
+        EXEC_ARGS="$EXEC_ARGS --ip \"$CUSTOM_IP\""
+    fi
+
+    cat > "$SERVICE_FILE" <<EOF
+#!/sbin/openrc-run
+
+name="$SERVICE_NAME"
+description="Liquid Glass Prism Agent"
+
+command="$INSTALL_DIR/$BINARY_NAME"
+command_args='$EXEC_ARGS'
+command_background=true
+pidfile="/run/${SERVICE_NAME}.pid"
+
+depend() {
+    need net
+}
+EOF
+
+    chmod +x "$SERVICE_FILE"
+
+    rc-update add "$SERVICE_NAME" default
+}
+
+configure_systemd() {
     step "Configuring systemd service..."
     SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
@@ -244,42 +297,71 @@ EOF
 
 start_service() {
     step "Starting service..."
-    systemctl restart "$SERVICE_NAME"
-    
-    info "Waiting for initialization..."
-    sleep 3
 
-    if ! systemctl is-active --quiet "$SERVICE_NAME"; then
-        error "Failed to start! Check logs: journalctl -u $SERVICE_NAME -n 20"
+    if [ "$OS_FAMILY" = "alpine" ]; then
+        rc-service "$SERVICE_NAME" restart
+    else
+        systemctl restart "$SERVICE_NAME"
     fi
+
+    sleep 3
 }
 
 show_result() {
-    LOGS=$(journalctl -u "$SERVICE_NAME" -n 50 --no-pager)
     echo ""
+
+    if [ "$OS_FAMILY" = "alpine" ]; then
+        LOGS=$(rc-service "$SERVICE_NAME" status 2>/dev/null || true)
+    else
+        LOGS=$(journalctl -u "$SERVICE_NAME" -n 50 --no-pager 2>/dev/null || true)
+    fi
+
     echo -e "${GREEN}═══════════════════════════════════════════════${NC}"
     echo -e "${GREEN}   Liquid Glass Prism Agent Installed!         ${NC}"
     echo -e "${GREEN}═══════════════════════════════════════════════${NC}"
     echo ""
-    
+
     if [ "$BETA_MODE" = true ]; then
         echo -e "  Version: ${YELLOW}Beta (Pre-release)${NC}"
+    else
+        echo -e "  Version: ${GREEN}Stable${NC}"
     fi
-    
+
     if [ "$SMART_MODE" = true ]; then
         echo -e "  Feature: ${CYAN}Smart Mode Enabled${NC}"
     fi
 
+    # 模式识别
     if echo "$LOGS" | grep -q "DNS Mode Started"; then
         echo -e "  Mode:    ${CYAN}DNS Client${NC} (Set DNS to 127.0.0.1)"
     elif echo "$LOGS" | grep -q "Proxy Mode Started"; then
         echo -e "  Mode:    ${CYAN}Proxy Agent${NC} (Open ports 80/443)"
     else
-        warn "  Syncing config, check logs shortly."
+        echo -e "  Status:  ${YELLOW}Starting / Syncing...${NC}"
     fi
-    
+
     echo ""
-    echo -e "  Uninstall: ${GREEN}curl -sL $SCRIPT_URL | bash -s -- --uninstall${NC}"
+
+    # 服务状态
+    if [ "$OS_FAMILY" = "alpine" ]; then
+        rc-service "$SERVICE_NAME" status || true
+    else
+        systemctl is-active "$SERVICE_NAME" >/dev/null 2>&1 && \
+            echo -e "  Service: ${GREEN}Running${NC}" || \
+            echo -e "  Service: ${RED}Not Running${NC}"
+    fi
+
+    echo ""
+    echo -e "  Logs:"
+    if [ "$OS_FAMILY" = "alpine" ]; then
+        echo "  (Use: rc-service $SERVICE_NAME status)"
+    else
+        echo "  journalctl -u $SERVICE_NAME -f"
+    fi
+
+    echo ""
+    echo -e "  Uninstall:"
+    echo -e "  ${GREEN}curl -sL $SCRIPT_URL | bash -s -- --uninstall${NC}"
     echo ""
     echo -e "${GREEN}═══════════════════════════════════════════════${NC}"
 }
