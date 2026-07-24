@@ -96,7 +96,7 @@ Automatically detect unlock status for the following services:
 ### One-Click Install (Recommended)
 
 ```bash
-curl -sL https://raw.githubusercontent.com/mslxi/Liquid-Glass-Prism-dns/main/install.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/jvzx94168/Liquid-Glass-Prism-dns/main/install.sh | sudo bash
 ```
 
 The script provides the following options:
@@ -111,11 +111,11 @@ After installation:
 
 ### Manual Installation
 
-Download the binary for your platform from [Releases](https://github.com/mslxi/Liquid-Glass-Prism-dns/releases).
+Download the binary for your platform from [Releases](https://github.com/jvzx94168/Liquid-Glass-Prism-dns/releases).
 
 ```bash
 # Download
-wget https://github.com/mslxi/Liquid-Glass-Prism-dns/releases/latest/download/prism-controller-linux-amd64
+wget https://github.com/jvzx94168/Liquid-Glass-Prism-dns/releases/latest/download/prism-controller-linux-amd64
 chmod +x prism-controller-linux-amd64
 mkdir -p /opt/prism
 mv prism-controller-linux-amd64 /opt/prism/prism-controller
@@ -132,7 +132,7 @@ cd /opt/prism && ./prism-controller --host 0.0.0.0 --port 8080
 Install Agent on node servers:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/mslxi/Liquid-Glass-Prism-dns/main/agent_install.sh | bash -s -- --master <Controller_URL> --secret <Node_Secret>
+curl -sL https://raw.githubusercontent.com/jvzx94168/Liquid-Glass-Prism-dns/main/agent_install.sh | bash -s -- --master <Controller_URL> --secret <Node_Secret>
 ```
 
 **Parameters**:
