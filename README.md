@@ -96,7 +96,7 @@ flowchart LR
 ### 一键安装 (推荐)
 
 ```bash
-wget -O install.sh https://raw.githubusercontent.com/mslxi/Liquid-Glass-Prism-dns/main/install.sh && sudo bash install.sh
+wget -O install.sh https://raw.githubusercontent.com/jvzx94168/Liquid-Glass-Prism-dns/main/install.sh && sudo bash install.sh
 ```
 
 脚本提供以下选项：
@@ -111,11 +111,11 @@ wget -O install.sh https://raw.githubusercontent.com/mslxi/Liquid-Glass-Prism-dn
 
 ### 手动安装
 
-从 [Releases](https://github.com/mslxi/Liquid-Glass-Prism-dns/releases) 下载对应平台的二进制文件。
+从 [Releases](https://github.com/jvzx94168/Liquid-Glass-Prism-dns/releases) 下载对应平台的二进制文件。
 
 ```bash
 # 下载
-wget https://github.com/mslxi/Liquid-Glass-Prism-dns/releases/latest/download/prism-controller-linux-amd64
+wget https://github.com/jvzx94168/Liquid-Glass-Prism-dns/releases/latest/download/prism-controller-linux-amd64
 chmod +x prism-controller-linux-amd64
 mkdir -p /opt/prism
 mv prism-controller-linux-amd64 /opt/prism/prism-controller
@@ -132,7 +132,7 @@ cd /opt/prism && ./prism-controller --host 0.0.0.0 --port 8080
 在节点服务器上安装 Agent：
 
 ```bash
-curl -sL https://raw.githubusercontent.com/mslxi/Liquid-Glass-Prism-dns/main/agent_install.sh | bash -s -- --master <Controller地址> --secret <节点密钥>
+curl -sL https://raw.githubusercontent.com/jvzx94168/Liquid-Glass-Prism-dns/main/agent_install.sh | bash -s -- --master <Controller地址> --secret <节点密钥>
 ```
 
 **参数说明**:
